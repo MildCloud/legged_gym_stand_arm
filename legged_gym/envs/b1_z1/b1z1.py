@@ -81,7 +81,7 @@ class B1Z1(LeggedRobot):
         self.render()
         for _ in range(self.cfg.control.decimation):
             self.torques = self._compute_torques(self.actions).view(self.torques.shape)
-            print('arm_torque', self.torques[:, -7:])
+            # print('arm_torque', self.torques[:, -7:])
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
             self.gym.simulate(self.sim)
             if self.device == 'cpu':
@@ -102,3 +102,15 @@ class B1Z1(LeggedRobot):
         out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.)
         return torch.sum(out_of_limits[:, :12], dim=1)
     
+    def _reward_stand_up_x(self):
+        self.forward_vec = to_torch([1., 0., 0.], device=self.device).repeat((self.num_envs, 1))
+        body_x_in_world = quat_rotate(self.base_quat, self.forward_vec)
+        # print(self.base_quat)
+        # print(self.forward_vec)
+        body_x_in_world_z= body_x_in_world[:, 2]
+        rew= to_torch(body_x_in_world_z)
+        # torch.clip(rew, max = 0.87)
+        torch.clip(rew, min = -0.7)
+        # mask = torch.where((body_x_in_world_z > 0.7), 2., 0.5)
+        # print(rew)
+        return rew

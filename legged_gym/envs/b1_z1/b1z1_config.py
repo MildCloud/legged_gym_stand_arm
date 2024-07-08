@@ -34,6 +34,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
         num_actions = 19
         num_observations = 256
+        num_envs = 4096
 
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.5] # x,y,z [m]
@@ -83,7 +84,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
         foot_name = "foot"
         penalize_contacts_on = ["thigh", "calf", "trunk"]
         terminate_after_contacts_on = ["base"]
-        self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
+        self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
         flip_visual_attachments = False
 
   
@@ -94,6 +95,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
             # torques = -0.0002
             torques = 0
             dof_pos_limits = -10.0
+            stand_up_x = 2
 
 class B1Z1CfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
