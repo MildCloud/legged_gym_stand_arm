@@ -40,6 +40,8 @@ from .cassie.cassie_config import CassieRoughCfg, CassieRoughCfgPPO
 from .a1.a1_config import A1RoughCfg, A1RoughCfgPPO
 from .lite3_old.lite3_old_config import Lite3OldCfg, Lite3OldCfgPPO
 from .lite3.lite3_config import Lite3Cfg, Lite3CfgPPO
+from .b1_z1.b1z1_config import B1Z1Cfg, B1Z1CfgPPO
+from .b1_z1.b1z1 import B1Z1
 
 
 import os
@@ -53,3 +55,4 @@ task_registry.register( "a1", LeggedRobot, A1RoughCfg(), A1RoughCfgPPO() )
 task_registry.register( "cassie", Cassie, CassieRoughCfg(), CassieRoughCfgPPO() )
 task_registry.register( "lite3_old", LeggedRobot, Lite3OldCfg(), Lite3OldCfgPPO() )
 task_registry.register( "lite3", LeggedRobot, Lite3Cfg(), Lite3CfgPPO() )
+task_registry.register( "b1z1", B1Z1, B1Z1Cfg(), B1Z1CfgPPO() )
