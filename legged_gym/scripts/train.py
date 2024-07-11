@@ -27,7 +27,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
-
 import numpy as np
 import os
 from datetime import datetime
@@ -38,8 +37,17 @@ from legged_gym.utils import get_args, task_registry
 import torch
 
 def train(args):
-    env, env_cfg = task_registry.make_env(name=args.task, args=args)
-    ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args)
+    env_cfg, _ = task_registry.get_cfgs(name=args.task)
+    log_root = "default"
+    if args.debug:
+        print("Debug Mode")
+        log_root = None
+        env_cfg.env.num_envs = 4
+        env_cfg.noise.add_noise = False
+        env_cfg.domain_rand.randomize_friction = False
+        env_cfg.domain_rand.push_robots = False
+    env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
+    ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, log_root=log_root)
     ppo_runner.learn(num_learning_iterations=train_cfg.runner.max_iterations, init_at_random_ep_len=True)
 
 if __name__ == '__main__':

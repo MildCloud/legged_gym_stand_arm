@@ -120,3 +120,7 @@ if __name__ == '__main__':
     args = get_args()
     args.headless = False
     play(args)
+
+# /home/tianshu/legged_gym/logs/b1z1/Jul08_15-28-17_ Unable to stand
+# /home/tianshu/legged_gym/logs/b1z1/Jul11_09-38-57_ Stand with thigh contact
+# /home/tianshu/legged_gym/logs/b1z1/Jul11_10-34-47_ Unstable stand
