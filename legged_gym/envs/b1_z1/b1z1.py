@@ -43,6 +43,42 @@ class B1Z1(LeggedRobot):
     def __init__(self, cfg, sim_params, physics_engine, sim_device, headless):
         super().__init__(cfg, sim_params, physics_engine, sim_device, headless)
     
+    def _init_buffers(self):
+        super()._init_buffers()
+        self.obs_history_buf = torch.zeros(self.num_envs, self.cfg.env.history_len, self.cfg.env.n_proprio, device=self.device, dtype=torch.float)
+        print('self.obs_history_buf', self.obs_history_buf.shape)
+    
+    def compute_observations(self):
+        """ Computes observations
+        """
+        self.dof_pos[:, -7:] = self.default_dof_pos[:, -7:]
+        self.dof_vel[:, -7:] = 0
+        prop_obs_buf = torch.cat((  self.base_lin_vel * self.obs_scales.lin_vel,
+                                    self.base_ang_vel  * self.obs_scales.ang_vel,
+                                    self.projected_gravity,
+                                    self.commands[:, :3] * self.commands_scale,
+                                    (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
+                                    self.dof_vel * self.obs_scales.dof_vel,
+                                    self.actions
+                                    ),dim=-1)
+        
+        # add perceptive inputs if not blind
+        if self.cfg.terrain.measure_heights:
+            heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements
+            prop_height_obs_buf = torch.cat((prop_obs_buf, heights), dim=-1)
+        else:
+            prop_height_obs_buf = prop_obs_buf
+        # add noise if needed
+        if self.add_noise:
+            prop_height_obs_buf += (2 * torch.rand_like(prop_height_obs_buf) - 1) * self.noise_scale_vec
+        
+        self.obs_buf = torch.cat([prop_height_obs_buf, self.obs_history_buf.view(self.num_envs, -1)], dim=-1)
+        self.obs_history_buf = torch.where(
+            (self.episode_length_buf <= 1)[:, None, None], 
+            torch.stack([prop_obs_buf] * self.cfg.env.history_len, dim=1),
+            torch.cat([self.obs_history_buf[:, 1:], prop_obs_buf.unsqueeze(1)], dim=1)
+        )
+
     def _get_noise_scale_vec(self, cfg):
         """ Sets a vector used to scale the noise added to the observations.
             [NOTE]: Must be adapted when changing the observations structure
@@ -53,7 +89,7 @@ class B1Z1(LeggedRobot):
         Returns:
             [torch.Tensor]: Vector of scales used to multiply a uniform distribution in [-1, 1]
         """
-        noise_vec = torch.zeros_like(self.obs_buf[0])
+        noise_vec = torch.zeros(self.num_envs, cfg.env.n_proprio + cfg.env.num_heights, device=self.device, dtype=torch.float)
         self.add_noise = self.cfg.noise.add_noise
         noise_scales = self.cfg.noise.noise_scales
         noise_level = self.cfg.noise.noise_level
@@ -62,7 +98,9 @@ class B1Z1(LeggedRobot):
         noise_vec[6:9] = noise_scales.gravity * noise_level
         noise_vec[9:12] = 0. # commands
         noise_vec[12:31] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
+        noise_vec[24:31] = 0.
         noise_vec[31:50] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
+        noise_vec[43:50] = 0.
         noise_vec[50:69] = 0. # previous actions
         if self.cfg.terrain.measure_heights:
             noise_vec[69:256] = noise_scales.height_measurements* noise_level * self.obs_scales.height_measurements
@@ -96,21 +134,55 @@ class B1Z1(LeggedRobot):
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
         return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras
     
+    def reset_idx(self, env_ids):
+        super().reset_idx(env_ids)
+        self.obs_history_buf[env_ids, :, :] = 0.
+    
     def _reward_dof_pos_limits(self):
         # Penalize dof positions too close to the limit
         out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.) # lower limit
         out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.)
-        return torch.sum(out_of_limits[:, :12], dim=1)
+        return torch.sum(out_of_limits[:, :12], dim=1)  
     
     def _reward_stand_up_x(self):
         self.forward_vec = to_torch([1., 0., 0.], device=self.device).repeat((self.num_envs, 1))
         body_x_in_world = quat_rotate(self.base_quat, self.forward_vec)
-        # print(self.base_quat)
-        # print(self.forward_vec)
         body_x_in_world_z= body_x_in_world[:, 2]
         rew= to_torch(body_x_in_world_z)
-        # torch.clip(rew, max = 0.87)
         torch.clip(rew, min = -0.7)
-        # mask = torch.where((body_x_in_world_z > 0.7), 2., 0.5)
-        # print(rew)
         return rew
+    
+    def _reward_orientation(self):
+        # Penalize non flat base orientation
+        return torch.sum(torch.square(self.projected_gravity[:, 1:]), dim=1)
+
+    def _reward_flfr_footforce(self):
+        feet_force = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
+        self.forward_vec = to_torch([1., 0., 0.], device=self.device).repeat((self.num_envs, 1))
+        body_x_in_world = quat_rotate(self.base_quat, self.forward_vec)
+        body_x_in_world_z= body_x_in_world[:, 2]
+        mask = torch.where(body_x_in_world_z > 0.6, 1., 0.3)
+        contact = (feet_force[:, 0] + feet_force[:, 1]) > 0.1
+        rew = torch.where(contact, 
+                          torch.ones(self.num_envs, device=self.device, dtype=torch.float), 
+                          torch.zeros(self.num_envs, device=self.device, dtype=torch.float))
+        return mask*rew
+    
+    def _reward_tracking_lin_vel(self):
+        # Tracking of linear velocity commands (xy axes)
+        lin_vel_error = torch.sum(torch.square(self.commands[:, :1] + self.base_lin_vel[:, 2:3]), dim=1)
+        lin_vel_error += torch.sum(torch.square(self.commands[:, 1:2] - self.base_lin_vel[:, 1:2]), dim=1)
+        return torch.exp(-lin_vel_error/self.cfg.rewards.tracking_sigma)
+    
+    def _reward_tracking_ang_vel(self):
+        # Tracking of angular velocity commands (yaw) 
+        ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 0])
+        return torch.exp(-ang_vel_error/self.cfg.rewards.tracking_sigma)
+    
+    def _reward_lin_vel_z(self):
+        # Penalize z axis base linear velocity
+        return torch.square(self.base_lin_vel[:, 0])
+    
+    def _reward_ang_vel_xy(self):
+        # Penalize xy axes base angular velocity
+        return torch.sum(torch.square(self.base_ang_vel[:, 1:]), dim=1)

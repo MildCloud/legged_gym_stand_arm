@@ -32,9 +32,16 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 
 class B1Z1Cfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
-        num_actions = 19
-        num_observations = 256
         num_envs = 4096
+        num_actions = 19
+        n_proprio = 69
+        history_len = 20
+        num_observations = n_proprio * history_len + n_proprio
+        num_heights = 187
+        num_observations += num_heights
+
+    class terrain( LeggedRobotCfg.terrain ):
+        measure_heights = True
 
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.5] # x,y,z [m]
@@ -90,12 +97,18 @@ class B1Z1Cfg( LeggedRobotCfg ):
   
     class rewards( LeggedRobotCfg.rewards ):
         soft_dof_pos_limit = 0.9
-        base_height_target = 0.25
+        base_height_target = 0.8
+        only_positive_rewards = False
         class scales( LeggedRobotCfg.rewards.scales ):
             # torques = -0.0002
             torques = 0
             dof_pos_limits = -10.0
             stand_up_x = 2
+            # flfr_footforce = -0.2
+            flfr_footforce = 0.
+            orientation = -0.2
+            base_height = -0.5
+            feet_air_time = 0
 
 class B1Z1CfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
