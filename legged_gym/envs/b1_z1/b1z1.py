@@ -92,7 +92,10 @@ class B1Z1(LeggedRobot):
         Returns:
             [torch.Tensor]: Vector of scales used to multiply a uniform distribution in [-1, 1]
         """
-        noise_vec = torch.zeros(self.num_envs, cfg.env.n_proprio + cfg.env.num_heights, device=self.device, dtype=torch.float)
+        if self.cfg.terrain.measure_heights:
+            noise_vec = torch.zeros(self.num_envs, cfg.env.n_proprio + cfg.env.num_heights, device=self.device, dtype=torch.float)
+        else:
+            noise_vec = torch.zeros(self.num_envs, cfg.env.n_proprio, device=self.device, dtype=torch.float)
         self.add_noise = self.cfg.noise.add_noise
         noise_scales = self.cfg.noise.noise_scales
         noise_level = self.cfg.noise.noise_level

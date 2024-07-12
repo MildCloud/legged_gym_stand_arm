@@ -38,10 +38,10 @@ class B1Z1Cfg( LeggedRobotCfg ):
         history_len = 20
         num_observations = n_proprio * history_len + n_proprio
         num_heights = 187
-        num_observations += num_heights
+        # num_observations += num_heights # Add height field map
 
     class terrain( LeggedRobotCfg.terrain ):
-        measure_heights = True
+        measure_heights = False
 
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.5] # x,y,z [m]
@@ -75,8 +75,13 @@ class B1Z1Cfg( LeggedRobotCfg ):
         # 'RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint', 
         # 'z1_waist', 'z1_shoulder', 'z1_elbow', 'z1_wrist_angle', 'z1_forearm_roll', 'z1_wrist_rotate', 'z1_jointGripper']
 
+    class commands( LeggedRobotCfg.commands ):
+        class ranges( LeggedRobotCfg.commands.ranges ):
+            lin_vel_x = [0., 0.] # min max [m/s]
+            lin_vel_y = [0., 0.]   # min max [m/s]
+    
     class control( LeggedRobotCfg.control ):
-        # PD Drive parameters:
+        # PD Drive parameters: only for legs
         control_type = 'P'
         stiffness = {'joint': 80.}  # [N*m/rad]
         damping = {'joint': 2.0}     # [N*m*s/rad]
@@ -89,7 +94,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/b1z1/urdf/b1z1.urdf'
         name = "b1z1"
         foot_name = "foot"
-        penalize_contacts_on = ["thigh", "calf", "trunk"]
+        penalize_contacts_on = ["thigh", "trunk"]
         terminate_after_contacts_on = ["base"]
         self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
         flip_visual_attachments = False
@@ -103,12 +108,13 @@ class B1Z1Cfg( LeggedRobotCfg ):
             # torques = -0.0002
             torques = 0
             dof_pos_limits = -10.0
-            stand_up_x = 2
-            # flfr_footforce = -0.2
-            flfr_footforce = 0.
+            stand_up_x = 3
+            flfr_footforce = -5 # -0.2
             orientation = -0.2
-            base_height = -0.5
+            base_height = -1 # -0.5
             feet_air_time = 0
+            tracking_lin_vel = 0.2
+            tracking_ang_vel = 0.2
 
 class B1Z1CfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
@@ -116,5 +122,6 @@ class B1Z1CfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'b1z1'
+        max_iterations = 5000
 
   
