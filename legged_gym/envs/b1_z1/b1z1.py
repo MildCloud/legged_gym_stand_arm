@@ -46,8 +46,9 @@ class B1Z1(LeggedRobot):
     
     def _init_buffers(self):
         super()._init_buffers()
-        self.obs_history_buf = torch.zeros(self.num_envs, self.cfg.env.history_len, self.cfg.env.n_proprio, device=self.device, dtype=torch.float)
-        print('self.obs_history_buf', self.obs_history_buf.shape)
+        if self.cfg.env.history_len > 0:
+            self.obs_history_buf = torch.zeros(self.num_envs, self.cfg.env.history_len, self.cfg.env.n_proprio, device=self.device, dtype=torch.float)
+            print('self.obs_history_buf', self.obs_history_buf.shape)
     
     def compute_observations(self):
         """ Computes observations
@@ -75,12 +76,15 @@ class B1Z1(LeggedRobot):
         if self.add_noise:
             prop_height_obs_buf += (2 * torch.rand_like(prop_height_obs_buf) - 1) * self.noise_scale_vec
         
-        self.obs_buf = torch.cat([prop_height_obs_buf, self.obs_history_buf.view(self.num_envs, -1)], dim=-1)
-        self.obs_history_buf = torch.where(
-            (self.episode_length_buf <= 1)[:, None, None], 
-            torch.stack([prop_obs_buf] * self.cfg.env.history_len, dim=1),
-            torch.cat([self.obs_history_buf[:, 1:], prop_obs_buf.unsqueeze(1)], dim=1)
-        )
+        if self.cfg.env.history_len > 0:
+            self.obs_buf = torch.cat([prop_height_obs_buf, self.obs_history_buf.view(self.num_envs, -1)], dim=-1)
+            self.obs_history_buf = torch.where(
+                (self.episode_length_buf <= 1)[:, None, None], 
+                torch.stack([prop_obs_buf] * self.cfg.env.history_len, dim=1),
+                torch.cat([self.obs_history_buf[:, 1:], prop_obs_buf.unsqueeze(1)], dim=1)
+            )
+        else:
+            self.obs_buf = prop_height_obs_buf
 
     def _get_noise_scale_vec(self, cfg):
         """ Sets a vector used to scale the noise added to the observations.
@@ -236,7 +240,8 @@ class B1Z1(LeggedRobot):
     
     def reset_idx(self, env_ids):
         super().reset_idx(env_ids)
-        self.obs_history_buf[env_ids, :, :] = 0.
+        if self.cfg.env.history_len > 0:
+            self.obs_history_buf[env_ids, :, :] = 0.
     
     def _reward_dof_pos_limits(self):
         # Penalize dof positions too close to the limit

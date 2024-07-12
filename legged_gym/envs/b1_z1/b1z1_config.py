@@ -35,7 +35,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
         num_envs = 4096
         num_actions = 19
         n_proprio = 69
-        history_len = 20
+        history_len = 0
         num_observations = n_proprio * history_len + n_proprio
         num_heights = 187
         # num_observations += num_heights # Add height field map

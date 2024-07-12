@@ -122,5 +122,7 @@ if __name__ == '__main__':
     play(args)
 
 # /home/tianshu/legged_gym/logs/b1z1/Jul08_15-28-17_ Unable to stand
-# /home/tianshu/legged_gym/logs/b1z1/Jul11_09-38-57_ Stand with thigh contact
+# /home/tianshu/legged_gym/logs/b1z1/Jul11_09-38-57_ Stand with calf contact
 # /home/tianshu/legged_gym/logs/b1z1/Jul11_10-34-47_ Unstable stand
+# /home/tianshu/legged_gym/logs/b1z1/Jul12_11-46-56_ Stand with calf contact with arm fixed and without height obs
+# /home/tianshu/legged_gym/logs/b1z1/Jul12_15-52-34_ Remove his obs from the above one
