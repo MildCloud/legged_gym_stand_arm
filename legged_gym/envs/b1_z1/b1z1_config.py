@@ -115,6 +115,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
             feet_air_time = 0
             tracking_lin_vel = 0.2
             tracking_ang_vel = 0.2
+            arm_action = -0.1
 
 class B1Z1CfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):

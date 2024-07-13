@@ -215,6 +215,7 @@ class B1Z1(LeggedRobot):
         """
         clip_actions = self.cfg.normalization.clip_actions
         self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
+        self.total_actions = self.actions.clone()
         self.actions[:, -7:] = 0
         # step physics and render each frame
         self.render()
@@ -291,3 +292,7 @@ class B1Z1(LeggedRobot):
     def _reward_ang_vel_xy(self):
         # Penalize xy axes base angular velocity
         return torch.sum(torch.square(self.base_ang_vel[:, 1:]), dim=1)
+    
+    def _reward_arm_action(self):
+        # Penalize useless arm action
+        return torch.sum(torch.square(self.total_actions[:, -7:]), dim=1)
