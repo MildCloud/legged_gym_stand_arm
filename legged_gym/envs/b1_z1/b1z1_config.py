@@ -29,6 +29,7 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
+import numpy as np
 
 class B1Z1Cfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
@@ -75,6 +76,44 @@ class B1Z1Cfg( LeggedRobotCfg ):
         # 'RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint', 
         # 'z1_waist', 'z1_shoulder', 'z1_elbow', 'z1_wrist_angle', 'z1_forearm_roll', 'z1_wrist_rotate', 'z1_jointGripper']
 
+    class goal_ee:
+        num_commands = 3
+        traj_time = [1, 3]
+        hold_time = [0.5, 2]
+        num_collision_check_samples = 10
+        command_mode = 'sphere'
+        collision_upper_limits = [0.1, 0.2, -0.05]
+        collision_lower_limits = [-0.8, -0.2, -0.7]
+        underground_limit = -0.7
+        arm_induced_pitch = 0.38 # Added to -pos_p (negative goal pitch) to get default eef orn_p
+        sphere_error_scale = [1, 1, 1]#[1 / (ranges.final_pos_l[1] - ranges.final_pos_l[0]), 1 / (ranges.final_pos_p[1] - ranges.final_pos_p[0]), 1 / (ranges.final_pos_y[1] - ranges.final_pos_y[0])]
+        orn_error_scale = [1, 1, 1]
+    
+        class sphere_center:
+            x_offset = 0.3 # Relative to base
+            y_offset = 0 # Relative to base
+            z_invariant_offset = 0.7 # Relative to terrain
+        
+        class ranges:
+            init_pos_start = [0.5, np.pi/8, 0]
+            init_pos_end = [0.7, 0, 0]
+            pos_l = [0.4, 0.95]
+            pos_p = [-1 * np.pi / 2.5, 1 * np.pi / 3]
+            pos_y = [-1.2, 1.2]
+
+            delta_orn_r = [-0.5, 0.5]
+            delta_orn_p = [-0.5, 0.5]
+            delta_orn_y = [-0.5, 0.5]
+
+            final_tracking_ee_reward = 0.55
+    
+    class arm:
+        init_target_ee_base = [0.2, 0.0, 0.2]
+        grasp_offset = 0.08
+        osc_kp = np.array([100, 100, 100, 30, 30, 30])
+        osc_kd = 2 * (osc_kp ** 0.5)
+
+
     class commands( LeggedRobotCfg.commands ):
         class ranges( LeggedRobotCfg.commands.ranges ):
             lin_vel_x = [0., 0.] # min max [m/s]
@@ -98,6 +137,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
         terminate_after_contacts_on = ["base"]
         self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
         flip_visual_attachments = False
+        gripper_name = "ee_gripper_link"
 
   
     class rewards( LeggedRobotCfg.rewards ):
