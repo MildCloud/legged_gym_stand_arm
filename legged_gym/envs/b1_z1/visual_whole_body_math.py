@@ -34,7 +34,6 @@ def euler_from_quat(quat_angle):
 
 @torch.jit.script
 def sphere2cart(sphere_coords):
-    # type: (Tensor) -> Tensor
     """ Convert spherical coordinates to cartesian coordinates
     Args:
         sphere_coords (torch.Tensor): Spherical coordinates (l, pitch, yaw)

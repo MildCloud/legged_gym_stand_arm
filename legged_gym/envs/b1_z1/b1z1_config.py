@@ -82,7 +82,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
         hold_time = [0.5, 2]
         num_collision_check_samples = 10
         command_mode = 'sphere'
-        collision_upper_limits = [0.1, 0.2, -0.05]
+        collision_upper_limits = [0.1, 0.2, 0.1]
         collision_lower_limits = [-0.8, -0.2, -0.7]
         underground_limit = -0.7
         arm_induced_pitch = 0.38 # Added to -pos_p (negative goal pitch) to get default eef orn_p
@@ -94,6 +94,11 @@ class B1Z1Cfg( LeggedRobotCfg ):
             y_offset = 0 # Relative to base
             z_invariant_offset = 0.7 # Relative to terrain
         
+        class sphere_center_stand:
+            x_offset = 0.3
+            y_offset = 0
+            z_offset = 0
+
         class ranges:
             init_pos_start = [0.5, np.pi/8, 0]
             init_pos_end = [0.7, 0, 0]

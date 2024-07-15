@@ -56,12 +56,15 @@ class B1Z1(LeggedRobot):
         # self.root_states = gymtorch.wrap_tensor(actor_root_state)
         # self.box_root_state = self._root_states[:, 1, :]
 
+        base_roll = euler_from_quat(self.base_quat)[0]
+        base_pitch = euler_from_quat(self.base_quat)[1]
         base_yaw = euler_from_quat(self.base_quat)[2]
-        # base_pitch = euler_from_quat(self.base_quat)[1]
         self.arm_base_offset = torch.tensor([0.3, 0., 0.09], device=self.device, dtype=torch.float).repeat(self.num_envs, 1)
         self.base_yaw_euler = torch.cat([torch.zeros(self.num_envs, 2, device=self.device), base_yaw.view(-1, 1)], dim=1)
         self.base_yaw_quat = quat_from_euler_xyz(torch.tensor(0), torch.tensor(0), base_yaw)
-        # self.base_yaw_pitch_quat = quat_from_euler_xyz(torch.tensor(0), base_pitch, base_yaw)
+        self.base_pitch_quat = quat_from_euler_xyz(torch.tensor(0), base_pitch, torch.tensor(0))
+        self.base_roll_pitch_quat = quat_from_euler_xyz(base_roll, base_pitch, torch.tensor(0))
+        self.base_pitch_yaw_quat = quat_from_euler_xyz(torch.tensor(0), base_pitch, base_yaw)
 
         net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
         self._contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
@@ -117,6 +120,10 @@ class B1Z1(LeggedRobot):
         self.ee_goal_center_offset = torch.tensor([self.cfg.goal_ee.sphere_center.x_offset, 
                                                    self.cfg.goal_ee.sphere_center.y_offset, 
                                                    self.cfg.goal_ee.sphere_center.z_invariant_offset], 
+                                                   device=self.device).repeat(self.num_envs, 1)
+        self.ee_goal_center_offset_stand = torch.tensor([self.cfg.goal_ee.sphere_center_stand.x_offset, 
+                                                   self.cfg.goal_ee.sphere_center_stand.y_offset, 
+                                                   self.cfg.goal_ee.sphere_center_stand.z_offset], 
                                                    device=self.device).repeat(self.num_envs, 1)
         
         self.curr_ee_goal_cart_world = self.get_ee_goal_spherical_center() + quat_apply(self.base_yaw_quat, self.curr_ee_goal_cart)
@@ -293,17 +300,17 @@ class B1Z1(LeggedRobot):
         # sphere_geom = gymutil.WireframeSphereGeometry(0.05, 4, 4, None, color=(1, 1, 0))
         # import ipdb; ipdb.set_trace()
 
-        center = self.ee_goal_center_offset
+        center = self.ee_goal_center_offset_stand
         bbox0 = center + self.collision_upper_limits
         bbox1 = center + self.collision_lower_limits
         bboxes = torch.stack([bbox0, bbox1], dim=1)
-        sphere_geom = gymutil.WireframeSphereGeometry(0.05, 4, 4, None, color=(1, 1, 0))
+        sphere_geom = gymutil.WireframeSphereGeometry(0.2, 4, 4, None, color=(1, 1, 0))
 
         for i in range(self.num_envs):
             bbox_geom = gymutil.WireframeBBoxGeometry(bboxes[i], None, color=(1, 0, 0))
-            quat = self.base_yaw_quat[i]
+            quat = self.base_pitch_quat[i]
             r = gymapi.Quat(quat[0], quat[1], quat[2], quat[3])
-            pose0 = gymapi.Transform(gymapi.Vec3(self.root_states[i, 0], self.root_states[i, 1], 0), r=r)
+            pose0 = gymapi.Transform(gymapi.Vec3(self.root_states[i, 0], self.root_states[i, 1], self.root_states[i, 2]), r=r)
             gymutil.draw_lines(bbox_geom, self.gym, self.viewer, self.envs[i], pose=pose0) 
 
             # pose0 = gymapi.Transform(gymapi.Vec3(bboxes[i, ww 0, 0], bboxes[i, 0, 1], bboxes[i, 0, 2]))    
@@ -427,9 +434,14 @@ class B1Z1(LeggedRobot):
         self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
         self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
+        base_roll = euler_from_quat(self.base_quat)[0]
+        base_pitch = euler_from_quat(self.base_quat)[1]
         base_yaw = euler_from_quat(self.base_quat)[2]
         self.base_yaw_euler[:] = torch.cat([torch.zeros(self.num_envs, 2, device=self.device), base_yaw.view(-1, 1)], dim=1)
         self.base_yaw_quat[:] = quat_from_euler_xyz(torch.tensor(0), torch.tensor(0), base_yaw)
+        self.base_pitch_quat[:] = quat_from_euler_xyz(torch.tensor(0), base_pitch, torch.tensor(0))
+        self.base_roll_pitch_quat = quat_from_euler_xyz(base_roll, base_pitch, torch.tensor(0))
+        self.base_pitch_yaw_quat = quat_from_euler_xyz(torch.tensor(0), base_pitch, base_yaw)
 
         self._post_physics_step_callback()
         self.update_curr_ee_goal()
