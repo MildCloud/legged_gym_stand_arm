@@ -126,4 +126,5 @@ if __name__ == '__main__':
 # /home/tianshu/legged_gym/logs/b1z1/Jul11_10-34-47_ Unstable stand
 # /home/tianshu/legged_gym/logs/b1z1/Jul12_11-46-56_ Stand with calf contact with arm fixed and without height obs
 # /home/tianshu/legged_gym/logs/b1z1/Jul12_15-52-34_ Remove his obs from the above one
-# /home/tianshu/legged_gym/logs/b1z1/Jul13_14-13-33_/model_2000.pt Penalize arm actions to achieve small std
+# /home/tianshu/legged_gym/logs/b1z1/Jul13_14-13-33_ Penalize arm actions to achieve small std
+# /home/tianshu/legged_gym/logs/b1z1/Jul16_10-35-23_ Shrink front legs

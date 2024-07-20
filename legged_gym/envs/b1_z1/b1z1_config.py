@@ -83,7 +83,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
         num_collision_check_samples = 10
         command_mode = 'sphere'
         collision_upper_limits = [0.1, 0.2, 0.1]
-        collision_lower_limits = [-0.8, -0.2, -0.7]
+        collision_lower_limits = [-0.8, -0.2, -0.4]
         underground_limit = -0.7
         arm_induced_pitch = 0.38 # Added to -pos_p (negative goal pitch) to get default eef orn_p
         sphere_error_scale = [1, 1, 1]#[1 / (ranges.final_pos_l[1] - ranges.final_pos_l[0]), 1 / (ranges.final_pos_p[1] - ranges.final_pos_p[0]), 1 / (ranges.final_pos_y[1] - ranges.final_pos_y[0])]
@@ -97,14 +97,17 @@ class B1Z1Cfg( LeggedRobotCfg ):
         class sphere_center_stand:
             x_offset = 0.3
             y_offset = 0
-            z_offset = 0
+            z_offset = 0.09
 
         class ranges:
             init_pos_start = [0.5, np.pi/8, 0]
             init_pos_end = [0.7, 0, 0]
-            pos_l = [0.4, 0.95]
+            pos_l = [0.4, 1.5]
             pos_p = [-1 * np.pi / 2.5, 1 * np.pi / 3]
             pos_y = [-1.2, 1.2]
+
+            pos_l_stand = [0.4, 0.7]
+            pos_p_stand = [-1 * np.pi / 2.5, 1 * np.pi / 6]
 
             delta_orn_r = [-0.5, 0.5]
             delta_orn_p = [-0.5, 0.5]
@@ -161,6 +164,8 @@ class B1Z1Cfg( LeggedRobotCfg ):
             tracking_lin_vel = 0.2
             tracking_ang_vel = 0.2
             arm_action = -0.1
+            stand_front_feet_shrink = -0.1
+
 
 class B1Z1CfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):

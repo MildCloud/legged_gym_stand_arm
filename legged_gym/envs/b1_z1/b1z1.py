@@ -293,13 +293,6 @@ class B1Z1(LeggedRobot):
 
 
     def _draw_collision_bbox(self):
-        # center = self.get_ee_goal_spherical_center()
-        # bbox0 = center + quat_apply(self.base_yaw_quat, self.collision_upper_limits)
-        # bbox1 = center + quat_apply(self.base_yaw_quat, self.collision_lower_limits)
-        # bboxes = torch.stack([bbox0, bbox1], dim=1)
-        # sphere_geom = gymutil.WireframeSphereGeometry(0.05, 4, 4, None, color=(1, 1, 0))
-        # import ipdb; ipdb.set_trace()
-
         center = self.ee_goal_center_offset_stand
         bbox0 = center + self.collision_upper_limits
         bbox1 = center + self.collision_lower_limits
@@ -309,6 +302,7 @@ class B1Z1(LeggedRobot):
         for i in range(self.num_envs):
             bbox_geom = gymutil.WireframeBBoxGeometry(bboxes[i], None, color=(1, 0, 0))
             quat = self.base_pitch_quat[i]
+            quat = self.base_quat[i]
             r = gymapi.Quat(quat[0], quat[1], quat[2], quat[3])
             pose0 = gymapi.Transform(gymapi.Vec3(self.root_states[i, 0], self.root_states[i, 1], self.root_states[i, 2]), r=r)
             gymutil.draw_lines(bbox_geom, self.gym, self.viewer, self.envs[i], pose=pose0) 
@@ -360,7 +354,7 @@ class B1Z1(LeggedRobot):
         ee_target_all_cart_world = torch.zeros_like(ee_target_all_sphere)
         for i in range(10):
             ee_target_cart = sphere2cart(ee_target_all_sphere[..., i])
-            ee_target_all_cart_world[..., i] = quat_apply(self.base_yaw_quat, ee_target_cart)
+            ee_target_all_cart_world[..., i] = quat_apply(self.base_quat, ee_target_cart)
         ee_target_all_cart_world += self.get_ee_goal_spherical_center()[:, :, None]
         # curr_ee_goal_cart_world = quat_apply(self.base_yaw_quat, self.curr_ee_goal_cart) + self.root_states[:, :3]
         for i in range(self.num_envs):
@@ -396,8 +390,8 @@ class B1Z1(LeggedRobot):
             self.torques = self._compute_torques(self.actions).view(self.torques.shape)
             self.torques[:, -7:] = 0
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
-            # all_pos_targets = torch.zeros_like(self.dof_pos)
-            # all_pos_targets[:, -7:] = self.default_dof_pos[:, -7:]
+            all_pos_targets = torch.zeros_like(self.dof_pos)
+            all_pos_targets[:, -7:] = self.default_dof_pos[:, -7:]
             self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(all_pos_targets))
             self.gym.simulate(self.sim)
             if self.device == 'cpu':
@@ -437,6 +431,7 @@ class B1Z1(LeggedRobot):
         base_roll = euler_from_quat(self.base_quat)[0]
         base_pitch = euler_from_quat(self.base_quat)[1]
         base_yaw = euler_from_quat(self.base_quat)[2]
+        # print('base_yaw in degree', base_yaw / 3.14 * 180)
         self.base_yaw_euler[:] = torch.cat([torch.zeros(self.num_envs, 2, device=self.device), base_yaw.view(-1, 1)], dim=1)
         self.base_yaw_quat[:] = quat_from_euler_xyz(torch.tensor(0), torch.tensor(0), base_yaw)
         self.base_pitch_quat[:] = quat_from_euler_xyz(torch.tensor(0), base_pitch, torch.tensor(0))
@@ -464,7 +459,7 @@ class B1Z1(LeggedRobot):
         #     self._draw_collision_bbox()
         self.gym.clear_lines(self.viewer)
         self._draw_ee_goal_curr()
-        self._draw_ee_goal_traj()
+        # self._draw_ee_goal_traj()
         self._draw_collision_bbox()
     
     # def _post_physics_step_callback(self):
@@ -506,14 +501,20 @@ class B1Z1(LeggedRobot):
         u = torch.bmm(j_eef_T, torch.linalg.solve(A, dpose))#.view(self.num_envs, 6)
         return u.squeeze(-1)
 
-    def get_ee_goal_spherical_center(self):
-        center = torch.cat([self.root_states[:, :2], torch.zeros(self.num_envs, 1, device=self.device)], dim=1)
-        center = center + quat_apply(self.base_yaw_quat, self.ee_goal_center_offset)
+    def get_ee_goal_spherical_center(self): # cyan point in render
+        # center = torch.cat([self.root_states[:, :2], torch.zeros(self.num_envs, 1, device=self.device)], dim=1)
+        center = self.root_states[:, :3]
+        center = center + quat_apply(self.base_quat, self.ee_goal_center_offset_stand)
         return center
 
     def _resample_ee_goal_sphere_once(self, env_ids):
         self.ee_goal_sphere[env_ids, 0] = torch_rand_float(self.goal_ee_ranges["pos_l"][0], self.goal_ee_ranges["pos_l"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         self.ee_goal_sphere[env_ids, 1] = torch_rand_float(self.goal_ee_ranges["pos_p"][0], self.goal_ee_ranges["pos_p"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+        self.ee_goal_sphere[env_ids, 2] = torch_rand_float(self.goal_ee_ranges["pos_y"][0], self.goal_ee_ranges["pos_y"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+
+    def _resample_ee_goal_sphere_once_stand(self, env_ids):
+        self.ee_goal_sphere[env_ids, 0] = torch_rand_float(self.goal_ee_ranges["pos_l_stand"][0], self.goal_ee_ranges["pos_l_stand"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+        self.ee_goal_sphere[env_ids, 1] = torch_rand_float(self.goal_ee_ranges["pos_p_stand"][0], self.goal_ee_ranges["pos_p_stand"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         self.ee_goal_sphere[env_ids, 2] = torch_rand_float(self.goal_ee_ranges["pos_y"][0], self.goal_ee_ranges["pos_y"][1], (len(env_ids), 1), device=self.device).squeeze(1)
     
     def _resample_ee_goal_orn_once(self, env_ids):
@@ -535,7 +536,7 @@ class B1Z1(LeggedRobot):
                 self._resample_ee_goal_orn_once(env_ids)
                 self.ee_start_sphere[env_ids] = self.ee_goal_sphere[env_ids].clone()
                 for i in range(10):
-                    self._resample_ee_goal_sphere_once(env_ids)
+                    self._resample_ee_goal_sphere_once_stand(env_ids)
                     collision_mask = self.collision_check(env_ids)
                     env_ids = env_ids[collision_mask]
                     if len(env_ids) == 0:
@@ -559,11 +560,11 @@ class B1Z1(LeggedRobot):
         self.curr_ee_goal_sphere[:] = torch.lerp(self.ee_start_sphere, self.ee_goal_sphere, t[:, None])
 
         self.curr_ee_goal_cart[:] = sphere2cart(self.curr_ee_goal_sphere)
-        ee_goal_cart_yaw_global = quat_apply(self.base_yaw_quat, self.curr_ee_goal_cart)
+        ee_goal_cart_global = quat_apply(self.base_quat, self.curr_ee_goal_cart)
         # TODO: add twisting motion by fixing yaw at traj start
-        self.curr_ee_goal_cart_world = self.get_ee_goal_spherical_center() + ee_goal_cart_yaw_global
+        self.curr_ee_goal_cart_world = self.get_ee_goal_spherical_center() + ee_goal_cart_global
         
-        default_yaw = torch.atan2(ee_goal_cart_yaw_global[:, 1], ee_goal_cart_yaw_global[:, 0])
+        default_yaw = torch.atan2(ee_goal_cart_global[:, 1], ee_goal_cart_global[:, 0])
         default_pitch = -self.curr_ee_goal_sphere[:, 1] + self.cfg.goal_ee.arm_induced_pitch
         self.ee_goal_orn_quat = quat_from_euler_xyz(self.ee_goal_orn_delta_rpy[:, 0] + np.pi / 2, default_pitch + self.ee_goal_orn_delta_rpy[:, 1], self.ee_goal_orn_delta_rpy[:, 2] + default_yaw)
         self.goal_timer += 1
@@ -629,3 +630,20 @@ class B1Z1(LeggedRobot):
     def _reward_arm_action(self):
         # Penalize useless arm action
         return torch.sum(torch.square(self.total_actions[:, -7:]), dim=1)
+    
+    def _reward_stand_front_feet_shrink(self):
+        # Penalize stretching the front feet when standing
+        base_pitch = euler_from_quat(self.base_quat)[1]
+        front_feet_dofs = self.dof_pos[:, :6]
+        # print('front_feet_dofs', front_feet_dofs)
+        front_shrink_dofs = torch.tensor([[0.0, 1.6, -2.6, 0.0, 1.6, -2.6]], device=self.device, dtype=torch.float)
+        front_shrink_dofs = front_shrink_dofs.repeat(self.num_envs, 1)
+        shrink_error = torch.sum(torch.square(front_feet_dofs - front_shrink_dofs), dim=1)
+        # print('shrink_error', shrink_error)
+        torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
+        # print('base_pitch', base_pitch)
+        rew = torch.where(base_pitch < -np.pi/3, 
+                          shrink_error, 
+                          torch.zeros(self.num_envs, device=self.device, dtype=torch.float))
+        # print('rew', rew)
+        return rew
