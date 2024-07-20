@@ -33,6 +33,7 @@ from isaacgym import gymapi
 from isaacgym import gymutil
 import numpy as np
 import torch
+import time
 
 # Base class for RL tasks
 class BaseTask():
@@ -97,6 +98,9 @@ class BaseTask():
                 self.viewer, gymapi.KEY_ESCAPE, "QUIT")
             self.gym.subscribe_viewer_keyboard_event(
                 self.viewer, gymapi.KEY_V, "toggle_viewer_sync")
+            print('subscribe to space')
+            self.gym.subscribe_viewer_keyboard_event(
+                self.viewer, gymapi.KEY_SPACE, "pause")
 
     def get_observations(self):
         return self.obs_buf
@@ -129,6 +133,16 @@ class BaseTask():
                     sys.exit()
                 elif evt.action == "toggle_viewer_sync" and evt.value > 0:
                     self.enable_viewer_sync = not self.enable_viewer_sync
+                elif evt.action == "pause" and evt.value > 0:
+                    self.pause = True
+                    while self.pause:
+                        time.sleep(0.1)
+                        self.gym.draw_viewer(self.viewer, self.sim, True)
+                        for evt in self.gym.query_viewer_action_events(self.viewer):
+                            if evt.action == "pause" and evt.value > 0:
+                                self.pause = False
+                        if self.gym.query_viewer_has_closed(self.viewer):
+                            sys.exit()
 
             # fetch results
             if self.device != 'cpu':
