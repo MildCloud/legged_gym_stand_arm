@@ -691,7 +691,7 @@ class B1Z1(LeggedRobot):
         # print('shrink_error', shrink_error)
         torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
         # print('base_pitch', base_pitch)
-        rew = torch.where(base_pitch < -np.pi/3, 
+        rew = torch.where(base_pitch < -np.pi/6, 
                           shrink_error, 
                           torch.zeros(self.num_envs, device=self.device, dtype=torch.float))
         # print('rew', rew)

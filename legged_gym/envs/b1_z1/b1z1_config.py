@@ -163,7 +163,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
             dof_pos_limits = -10.0
             stand_up_x = 3
             flfr_footforce = -5 # -0.2
-            orientation = -0.2
+            orientation = 0
             base_height = -1 # -0.5
             feet_air_time = 0
             tracking_lin_vel = 0.2
