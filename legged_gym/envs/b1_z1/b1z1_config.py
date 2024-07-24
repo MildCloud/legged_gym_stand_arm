@@ -107,12 +107,12 @@ class B1Z1Cfg( LeggedRobotCfg ):
             pos_p = [-1 * np.pi / 2.5, 1 * np.pi / 3]
             pos_y = [-1.2, 1.2]
 
-            pos_l_stand = [0.7, 0.7]
+            pos_l_stand = [0.5, 0.9]
             # pos_p_stand = [-1 * np.pi / 4, 1 * np.pi / 6]
             # pos_p_stand = [-1 * np.pi / 6, -1 * np.pi / 12]
-            pos_p_stand = [-1 * np.pi / 6, -1 * np.pi / 12]
-            # pos_y_stand = [-1 * np.pi / 4, 1 * np.pi / 4]
-            pos_y_stand = [0, 0]
+            pos_p_stand = [-1 * np.pi / 3, -1 * np.pi / 12]
+            pos_y_stand = [-1 * np.pi / 6, 1 * np.pi / 6]
+            # pos_y_stand = [0, 0]
 
             delta_orn_r = [-0.5, 0.5]
             delta_orn_p = [-0.5, 0.5]
