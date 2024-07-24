@@ -36,6 +36,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
         num_envs = 4096
         num_actions = 19
         n_proprio = 69
+        # n_proprio = 69 + 3
         history_len = 0
         num_observations = n_proprio * history_len + n_proprio
         num_heights = 187
@@ -106,10 +107,10 @@ class B1Z1Cfg( LeggedRobotCfg ):
             pos_p = [-1 * np.pi / 2.5, 1 * np.pi / 3]
             pos_y = [-1.2, 1.2]
 
-            pos_l_stand = [0.65, 0.65]
+            pos_l_stand = [0.7, 0.7]
             # pos_p_stand = [-1 * np.pi / 4, 1 * np.pi / 6]
             # pos_p_stand = [-1 * np.pi / 6, -1 * np.pi / 12]
-            pos_p_stand = [-1 * np.pi / 7, -1 * np.pi / 7]
+            pos_p_stand = [-1 * np.pi / 6, -1 * np.pi / 12]
             # pos_y_stand = [-1 * np.pi / 4, 1 * np.pi / 4]
             pos_y_stand = [0, 0]
 
@@ -169,6 +170,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
             tracking_ang_vel = 0.2
             arm_action = -0.1
             stand_front_feet_shrink = -0.1
+            # tracking_ee_world = 0.1
 
 
 class B1Z1CfgPPO( LeggedRobotCfgPPO ):

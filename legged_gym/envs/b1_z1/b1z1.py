@@ -141,10 +141,13 @@ class B1Z1(LeggedRobot):
         dof_pos[:, -7:] = self.default_dof_pos[:, -7:]
         dof_vel = self.dof_vel.clone()
         dof_vel[:, -7:] = 0
+        arm_base_pos = self.root_states[:, :3] + quat_apply(self.base_quat, self.arm_base_offset)
+        ee_goal_local_cart = quat_rotate_inverse(self.base_quat, self.curr_ee_goal_cart_world - arm_base_pos)
         prop_obs_buf = torch.cat((  self.base_lin_vel * self.obs_scales.lin_vel,
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
                                     self.commands[:, :3] * self.commands_scale,
+                                    # ee_goal_local_cart,
                                     (dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                     dof_vel * self.obs_scales.dof_vel,
                                     self.actions
@@ -389,22 +392,14 @@ class B1Z1(LeggedRobot):
 
         dpos = self.curr_ee_goal_cart_world - self.ee_pos
         drot = orientation_error(self.ee_goal_orn_quat, self.ee_orn / torch.norm(self.ee_orn, dim=-1).unsqueeze(-1))
-        # drot[:, :] = 0
         dpose = torch.cat([dpos, drot], -1).unsqueeze(-1)
-        if self.is_init[0]:
-            print('dpose[0]', dpose[0])
-        # print(self.ee_goal_orn_quat[0], self.ee_orn[0])
         arm_pos_targets = self.control_ik(dpose) + self.dof_pos[:, -7:-1]
         all_pos_targets = torch.zeros_like(self.dof_pos)
-        # sample_high = self.curr_ee_goal_cart_world[:, 2] > 1.3
-        # all_pos_targets[:, -7:-1] = torch.where(sample_high[:, None].repeat([1, 6]), arm_pos_targets, self.default_dof_pos[:, -7:-1])
         all_pos_targets[:, -7:-1] = torch.where(self.is_init[:, None].repeat([1, 6]), self.default_dof_pos[:, -7:-1], arm_pos_targets)
-        # all_pos_targets[:, -7:-1] = arm_pos_targets
 
         for _ in range(self.cfg.control.decimation):
             self.torques = self._compute_torques(self.actions).view(self.torques.shape)
             self.torques[:, -7:] = 0
-            # self.torques[:, :] = 0
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
             # all_pos_targets = torch.zeros_like(self.dof_pos)
             # all_pos_targets[:, -7:] = self.default_dof_pos[:, -7:]
@@ -550,14 +545,20 @@ class B1Z1(LeggedRobot):
         ee_goal_delta_orn_y = torch_rand_float(self.goal_ee_ranges["delta_orn_y"][0], self.goal_ee_ranges["delta_orn_y"][1], (len(env_ids), 1), device=self.device)
         self.ee_goal_orn_delta_rpy[env_ids, :] = torch.cat([ee_goal_delta_orn_r, ee_goal_delta_orn_p, ee_goal_delta_orn_y], dim=-1)
 
-    def _compute_ee_start_sphere_from_cur_ee(self, env_ids):
-        """Get the spherical coordinate centered at the arm base of the curr_ee and give that value to ee_start"""
-        ee_pose = self.rigid_body_state[env_ids, self.gripper_idx, :3]
-        ee_goal_spherical_center = self.get_ee_goal_spherical_center()
-        ee_pose_base = quat_rotate_inverse(self.base_quat[env_ids], (ee_pose - ee_goal_spherical_center[env_ids]))
-        # ee_pose_base = quat_rotate_inverse(self.base_quat_fix[env_ids], (self.root_states[env_ids, :3] - self.root_states[env_ids, :3]))
-        self.ee_start_sphere[env_ids] = cart2sphere(ee_pose_base)
+    def _recenter_ee_goal_sphere(self, env_ids):
+        """
+        Change the center of the ee_goal_sphere from the arm_base to base, and record the quat
+        """
+        self.base_quat_fix = self.base_quat.clone()
+        ee_goal_cart = sphere2cart(self.ee_goal_sphere[env_ids])
+        ee_goal_cart = ee_goal_cart + self.ee_goal_center_offset_stand[env_ids]
+        self.ee_goal_sphere[env_ids] = cart2sphere(ee_goal_cart)
 
+    def _compute_ee_start_sphere_from_cur_ee(self, env_ids):
+        """Get the spherical coordinate centered at the base of the curr_ee and give that value to ee_start"""
+        ee_pose = self.rigid_body_state[env_ids, self.gripper_idx, :3]
+        ee_pose_base = quat_rotate_inverse(self.base_quat_fix[env_ids], (ee_pose - self.root_states[env_ids, :3]))
+        self.ee_start_sphere[env_ids] = cart2sphere(ee_pose_base)
     
     def _resample_ee_goal(self, env_ids, is_init=False):
 
@@ -568,12 +569,14 @@ class B1Z1(LeggedRobot):
                 self.ee_goal_orn_delta_rpy[env_ids, :] = 0
                 self.ee_start_sphere[env_ids] = self.init_start_ee_sphere[:]
                 self.ee_goal_sphere[env_ids] = self.init_end_ee_sphere[:]
+                self._recenter_ee_goal_sphere(env_ids)
                 self.is_init = torch.ones(self.num_envs, 1, device=self.device, dtype=torch.bool).squeeze(-1)
             else:
                 self.is_init[env_ids] = 0
                 self._resample_ee_goal_orn_once(env_ids)
                 self.ee_start_sphere[env_ids] = self.ee_goal_sphere[env_ids].clone()
                 self._resample_ee_goal_sphere_once_stand(env_ids)
+                self._recenter_ee_goal_sphere(env_ids)
                 self._compute_ee_start_sphere_from_cur_ee(env_ids)
                 # for i in range(10):
                 #     self._resample_ee_goal_sphere_once_stand(env_ids)
@@ -600,11 +603,10 @@ class B1Z1(LeggedRobot):
         self.curr_ee_goal_sphere[:] = torch.lerp(self.ee_start_sphere, self.ee_goal_sphere, t[:, None])
 
         self.curr_ee_goal_cart[:] = sphere2cart(self.curr_ee_goal_sphere)
-        ee_goal_cart_global = quat_apply(self.base_quat, self.curr_ee_goal_cart)
-        # TODO: add twisting motion by fixing yaw at traj start
-        self.curr_ee_goal_cart_world = self.get_ee_goal_spherical_center() + ee_goal_cart_global
-        self.final_ee_goal_cart_world = self.get_ee_goal_spherical_center() + quat_apply(self.base_quat, sphere2cart(self.ee_goal_sphere))
-        self.final_ee_start_cart_world = self.get_ee_goal_spherical_center() + quat_apply(self.base_quat, sphere2cart(self.ee_start_sphere))
+        ee_goal_cart_global = quat_apply(self.base_quat_fix, self.curr_ee_goal_cart)
+        self.curr_ee_goal_cart_world = self.root_states[:, :3] + ee_goal_cart_global
+        self.final_ee_goal_cart_world = self.root_states[:, :3] + quat_apply(self.base_quat_fix, sphere2cart(self.ee_goal_sphere))
+        self.final_ee_start_cart_world = self.root_states[:, :3] + quat_apply(self.base_quat_fix, sphere2cart(self.ee_start_sphere))
         
         # default_yaw = torch.atan2(ee_goal_cart_global[:, 1], ee_goal_cart_global[:, 0])
         # default_pitch = -self.curr_ee_goal_sphere[:, 1] + self.cfg.goal_ee.arm_induced_pitch
@@ -694,3 +696,8 @@ class B1Z1(LeggedRobot):
                           torch.zeros(self.num_envs, device=self.device, dtype=torch.float))
         # print('rew', rew)
         return rew
+    
+    def _reward_tracking_ee_world(self):
+        ee_pos_error = torch.sum(torch.abs(self.ee_pos - self.curr_ee_goal_cart_world), dim=1)
+        rew = torch.exp(-ee_pos_error/self.cfg.rewards.tracking_ee_sigma * 2)
+        return rew, ee_pos_error
