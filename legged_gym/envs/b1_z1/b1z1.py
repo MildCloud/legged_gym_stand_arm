@@ -331,6 +331,9 @@ class B1Z1(LeggedRobot):
 
         axes_geom = gymutil.AxesGeometry(scale=0.2)
 
+        sphere_geom_4 = gymutil.WireframeSphereGeometry(0.05, 4, 4, None, color=(0.7, 0, 1)) # purple
+        sphere_geom_5 = gymutil.WireframeSphereGeometry(0.05, 4, 4, None, color=(0.7, 0.4, 0.4)) # orange
+
         for i in range(self.num_envs):
             sphere_pose = gymapi.Transform(gymapi.Vec3(self.curr_ee_goal_cart_world[i, 0], self.curr_ee_goal_cart_world[i, 1], self.curr_ee_goal_cart_world[i, 2]), r=None)
             gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[i], sphere_pose) 
@@ -344,6 +347,12 @@ class B1Z1(LeggedRobot):
             pose = gymapi.Transform(gymapi.Vec3(self.curr_ee_goal_cart_world[i, 0], self.curr_ee_goal_cart_world[i, 1], self.curr_ee_goal_cart_world[i, 2]), 
                                     r=gymapi.Quat(self.ee_goal_orn_quat[i, 0], self.ee_goal_orn_quat[i, 1], self.ee_goal_orn_quat[i, 2], self.ee_goal_orn_quat[i, 3]))
             gymutil.draw_lines(axes_geom, self.gym, self.viewer, self.envs[i], pose)
+            
+            sphere_pose_4 = gymapi.Transform(gymapi.Vec3(self.final_ee_goal_cart_world[i, 0], self.final_ee_goal_cart_world[i, 1], self.final_ee_goal_cart_world[i, 2]), r=None)
+            gymutil.draw_lines(sphere_geom_4, self.gym, self.viewer, self.envs[i], sphere_pose_4) 
+
+            sphere_pose_5 = gymapi.Transform(gymapi.Vec3(self.final_ee_start_cart_world[i, 0], self.final_ee_start_cart_world[i, 1], self.final_ee_start_cart_world[i, 2]), r=None)
+            gymutil.draw_lines(sphere_geom_5, self.gym, self.viewer, self.envs[i], sphere_pose_5) 
 
     def _draw_ee_goal_traj(self):
         sphere_geom = gymutil.WireframeSphereGeometry(0.005, 8, 8, None, color=(1, 0, 0))
@@ -380,18 +389,25 @@ class B1Z1(LeggedRobot):
 
         dpos = self.curr_ee_goal_cart_world - self.ee_pos
         drot = orientation_error(self.ee_goal_orn_quat, self.ee_orn / torch.norm(self.ee_orn, dim=-1).unsqueeze(-1))
+        # drot[:, :] = 0
         dpose = torch.cat([dpos, drot], -1).unsqueeze(-1)
+        if self.is_init[0]:
+            print('dpose[0]', dpose[0])
         # print(self.ee_goal_orn_quat[0], self.ee_orn[0])
         arm_pos_targets = self.control_ik(dpose) + self.dof_pos[:, -7:-1]
         all_pos_targets = torch.zeros_like(self.dof_pos)
-        all_pos_targets[:, -7:-1] = arm_pos_targets
+        # sample_high = self.curr_ee_goal_cart_world[:, 2] > 1.3
+        # all_pos_targets[:, -7:-1] = torch.where(sample_high[:, None].repeat([1, 6]), arm_pos_targets, self.default_dof_pos[:, -7:-1])
+        all_pos_targets[:, -7:-1] = torch.where(self.is_init[:, None].repeat([1, 6]), self.default_dof_pos[:, -7:-1], arm_pos_targets)
+        # all_pos_targets[:, -7:-1] = arm_pos_targets
 
         for _ in range(self.cfg.control.decimation):
             self.torques = self._compute_torques(self.actions).view(self.torques.shape)
             self.torques[:, -7:] = 0
+            # self.torques[:, :] = 0
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
-            all_pos_targets = torch.zeros_like(self.dof_pos)
-            all_pos_targets[:, -7:] = self.default_dof_pos[:, -7:]
+            # all_pos_targets = torch.zeros_like(self.dof_pos)
+            # all_pos_targets[:, -7:] = self.default_dof_pos[:, -7:]
             self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(all_pos_targets))
             self.gym.simulate(self.sim)
             if self.device == 'cpu':
@@ -500,6 +516,14 @@ class B1Z1(LeggedRobot):
         A = torch.bmm(self.ee_j_eef, j_eef_T) + lmbda[None, ...]
         u = torch.bmm(j_eef_T, torch.linalg.solve(A, dpose))#.view(self.num_envs, 6)
         return u.squeeze(-1)
+    
+    # def control_ik(self, dpose):
+    #     j_eef_T = torch.transpose(self.ee_j_eef, 1, 2)
+    #     lmbda = torch.eye(6, device=self.device) * (0.05 ** 2)
+    #     A = torch.bmm(j_eef_T, self.ee_j_eef) + lmbda[None, ...]
+    #     print('dpose.shape', dpose.shape)
+    #     u = torch.bmm(torch.bmm(torch.inverse(A), j_eef_T), dpose)
+    #     return u.squeeze(-1)
 
     def get_ee_goal_spherical_center(self): # cyan point in render
         # center = torch.cat([self.root_states[:, :2], torch.zeros(self.num_envs, 1, device=self.device)], dim=1)
@@ -515,14 +539,26 @@ class B1Z1(LeggedRobot):
     def _resample_ee_goal_sphere_once_stand(self, env_ids):
         self.ee_goal_sphere[env_ids, 0] = torch_rand_float(self.goal_ee_ranges["pos_l_stand"][0], self.goal_ee_ranges["pos_l_stand"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         self.ee_goal_sphere[env_ids, 1] = torch_rand_float(self.goal_ee_ranges["pos_p_stand"][0], self.goal_ee_ranges["pos_p_stand"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-        self.ee_goal_sphere[env_ids, 2] = torch_rand_float(self.goal_ee_ranges["pos_y"][0], self.goal_ee_ranges["pos_y"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-    
+        self.ee_goal_sphere[env_ids, 2] = torch_rand_float(self.goal_ee_ranges["pos_y_stand"][0], self.goal_ee_ranges["pos_y_stand"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+        # self.ee_goal_sphere[env_ids, 0] = torch.ones(len(env_ids), 1, device=self.device).squeeze(1)
+        # self.ee_goal_sphere[env_ids, 1] = torch.zeros(len(env_ids), 1, device=self.device).squeeze(1)
+        # self.ee_goal_sphere[env_ids, 2] = torch.zeros(len(env_ids), 1, device=self.device).squeeze(1)
+
     def _resample_ee_goal_orn_once(self, env_ids):
         ee_goal_delta_orn_r = torch_rand_float(self.goal_ee_ranges["delta_orn_r"][0], self.goal_ee_ranges["delta_orn_r"][1], (len(env_ids), 1), device=self.device)
         ee_goal_delta_orn_p = torch_rand_float(self.goal_ee_ranges["delta_orn_p"][0], self.goal_ee_ranges["delta_orn_p"][1], (len(env_ids), 1), device=self.device)
         ee_goal_delta_orn_y = torch_rand_float(self.goal_ee_ranges["delta_orn_y"][0], self.goal_ee_ranges["delta_orn_y"][1], (len(env_ids), 1), device=self.device)
         self.ee_goal_orn_delta_rpy[env_ids, :] = torch.cat([ee_goal_delta_orn_r, ee_goal_delta_orn_p, ee_goal_delta_orn_y], dim=-1)
 
+    def _compute_ee_start_sphere_from_cur_ee(self, env_ids):
+        """Get the spherical coordinate centered at the arm base of the curr_ee and give that value to ee_start"""
+        ee_pose = self.rigid_body_state[env_ids, self.gripper_idx, :3]
+        ee_goal_spherical_center = self.get_ee_goal_spherical_center()
+        ee_pose_base = quat_rotate_inverse(self.base_quat[env_ids], (ee_pose - ee_goal_spherical_center[env_ids]))
+        # ee_pose_base = quat_rotate_inverse(self.base_quat_fix[env_ids], (self.root_states[env_ids, :3] - self.root_states[env_ids, :3]))
+        self.ee_start_sphere[env_ids] = cart2sphere(ee_pose_base)
+
+    
     def _resample_ee_goal(self, env_ids, is_init=False):
 
         if len(env_ids) > 0:
@@ -532,15 +568,19 @@ class B1Z1(LeggedRobot):
                 self.ee_goal_orn_delta_rpy[env_ids, :] = 0
                 self.ee_start_sphere[env_ids] = self.init_start_ee_sphere[:]
                 self.ee_goal_sphere[env_ids] = self.init_end_ee_sphere[:]
+                self.is_init = torch.ones(self.num_envs, 1, device=self.device, dtype=torch.bool).squeeze(-1)
             else:
+                self.is_init[env_ids] = 0
                 self._resample_ee_goal_orn_once(env_ids)
                 self.ee_start_sphere[env_ids] = self.ee_goal_sphere[env_ids].clone()
-                for i in range(10):
-                    self._resample_ee_goal_sphere_once_stand(env_ids)
-                    collision_mask = self.collision_check(env_ids)
-                    env_ids = env_ids[collision_mask]
-                    if len(env_ids) == 0:
-                        break
+                self._resample_ee_goal_sphere_once_stand(env_ids)
+                self._compute_ee_start_sphere_from_cur_ee(env_ids)
+                # for i in range(10):
+                #     self._resample_ee_goal_sphere_once_stand(env_ids)
+                #     collision_mask = self.collision_check(env_ids)
+                #     env_ids = env_ids[collision_mask]
+                #     if len(env_ids) == 0:
+                #         break
             self.ee_goal_cart[init_env_ids, :] = sphere2cart(self.ee_goal_sphere[init_env_ids, :])
             self.goal_timer[init_env_ids] = 0.0
 
@@ -563,10 +603,17 @@ class B1Z1(LeggedRobot):
         ee_goal_cart_global = quat_apply(self.base_quat, self.curr_ee_goal_cart)
         # TODO: add twisting motion by fixing yaw at traj start
         self.curr_ee_goal_cart_world = self.get_ee_goal_spherical_center() + ee_goal_cart_global
+        self.final_ee_goal_cart_world = self.get_ee_goal_spherical_center() + quat_apply(self.base_quat, sphere2cart(self.ee_goal_sphere))
+        self.final_ee_start_cart_world = self.get_ee_goal_spherical_center() + quat_apply(self.base_quat, sphere2cart(self.ee_start_sphere))
         
-        default_yaw = torch.atan2(ee_goal_cart_global[:, 1], ee_goal_cart_global[:, 0])
-        default_pitch = -self.curr_ee_goal_sphere[:, 1] + self.cfg.goal_ee.arm_induced_pitch
-        self.ee_goal_orn_quat = quat_from_euler_xyz(self.ee_goal_orn_delta_rpy[:, 0] + np.pi / 2, default_pitch + self.ee_goal_orn_delta_rpy[:, 1], self.ee_goal_orn_delta_rpy[:, 2] + default_yaw)
+        # default_yaw = torch.atan2(ee_goal_cart_global[:, 1], ee_goal_cart_global[:, 0])
+        # default_pitch = -self.curr_ee_goal_sphere[:, 1] + self.cfg.goal_ee.arm_induced_pitch
+        # self.ee_goal_orn_quat = quat_from_euler_xyz(self.ee_goal_orn_delta_rpy[:, 0] + np.pi / 2, default_pitch + self.ee_goal_orn_delta_rpy[:, 1], self.ee_goal_orn_delta_rpy[:, 2] + default_yaw)
+        self.ee_goal_orn_euler = torch.zeros(self.num_envs, 3, device=self.device)
+        self.ee_goal_orn_euler[:, 0] = np.pi / 2
+        self.ee_goal_orn_euler[:, 1] = -np.pi / 12
+        self.ee_goal_orn_quat = quat_from_euler_xyz(self.ee_goal_orn_euler[:, 0], self.ee_goal_orn_euler[:, 1], self.ee_goal_orn_euler[:, 2])
+
         self.goal_timer += 1
         resample_id = (self.goal_timer > self.traj_total_timesteps).nonzero(as_tuple=False).flatten()
         self._resample_ee_goal(resample_id)

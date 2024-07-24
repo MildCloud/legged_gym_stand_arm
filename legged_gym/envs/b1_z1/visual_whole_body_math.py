@@ -50,6 +50,22 @@ def sphere2cart(sphere_coords):
     return cart_coords
 
 @torch.jit.script
+def cart2sphere(cart_coords):
+    """ Convert cartesian coordinates to spherical coordinates
+    Args:
+        cart_coords (torch.Tensor): Cartesian coordinates (x, y, z)
+    Returns:
+        sphere_coords (torch.Tensor): Spherical coordinates (l, pitch, yaw)
+    """
+    sphere_coords = torch.zeros_like(cart_coords)
+    xy_len = torch.norm(cart_coords[:, :2], dim=1)
+    sphere_coords[:, 0] = torch.norm(cart_coords, dim=1)
+    sphere_coords[:, 1] = torch.atan2(cart_coords[:, 2], xy_len)
+    sphere_coords[:, 2] = torch.atan2(cart_coords[:, 1], cart_coords[:, 0])
+    return sphere_coords
+
+
+@torch.jit.script
 def quat_conjugate(a):
     shape = a.shape
     a = a.reshape(-1, 4)
