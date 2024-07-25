@@ -170,7 +170,7 @@ class B1Z1Cfg( LeggedRobotCfg ):
             tracking_ang_vel = 0.2
             arm_action = -0.1
             stand_front_feet_shrink = -0.1
-            tracking_ee_world = 20
+            tracking_ee_world = 5
         tracking_ee_sigma = 1.0
 
 
