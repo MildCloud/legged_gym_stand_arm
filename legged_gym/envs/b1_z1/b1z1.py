@@ -541,7 +541,7 @@ class B1Z1(LeggedRobot):
         heigh_ee_goal_sphere[env_ids, 0] = torch_rand_float(0.9, 0.9, (len(env_ids), 1), device=self.device).squeeze(1)
         heigh_ee_goal_sphere[env_ids, 1] = torch_rand_float(np.pi / 2, np.pi / 2, (len(env_ids), 1), device=self.device).squeeze(1)
         stand_mask = base_pitch[env_ids] > -np.pi / 6
-        self.ee_goal_sphere[env_ids] = torch.where(stand_mask[:, None].repeat(1, 3), self.ee_goal_sphere[env_ids], heigh_ee_goal_sphere[env_ids])
+        self.ee_goal_sphere[env_ids] = torch.where(stand_mask[:, None].repeat(1, 3), heigh_ee_goal_sphere[env_ids], self.ee_goal_sphere[env_ids])
         
     def _resample_ee_goal_orn_once(self, env_ids):
         ee_goal_delta_orn_r = torch_rand_float(self.goal_ee_ranges["delta_orn_r"][0], self.goal_ee_ranges["delta_orn_r"][1], (len(env_ids), 1), device=self.device)
@@ -572,7 +572,8 @@ class B1Z1(LeggedRobot):
             if is_init:
                 self.ee_goal_orn_delta_rpy[env_ids, :] = 0
                 self.ee_start_sphere[env_ids] = self.init_start_ee_sphere[:]
-                self.ee_goal_sphere[env_ids] = self.init_end_ee_sphere[:]
+                # self.ee_goal_sphere[env_ids] = self.init_end_ee_sphere[:]
+                self._resample_ee_goal_sphere_once_stand(env_ids)
                 self._recenter_ee_goal_sphere(env_ids)
                 self.is_init = torch.ones(self.num_envs, 1, device=self.device, dtype=torch.bool).squeeze(-1)
             else:
@@ -701,4 +702,5 @@ class B1Z1(LeggedRobot):
     def _reward_tracking_ee_world(self):
         ee_pos_error = torch.sum(torch.abs(self.ee_pos - self.curr_ee_goal_cart_world), dim=1)
         rew = torch.exp(-ee_pos_error/self.cfg.rewards.tracking_ee_sigma * 2)
+        rew = torch.where(self.is_init,  torch.zeros(self.num_envs, device=self.device, dtype=torch.float), rew)
         return rew
