@@ -131,3 +131,4 @@ if __name__ == '__main__':
 # /home/tianshu/legged_gym/logs/b1z1/Jul24_14-51-52_ remove the orientation reward to achieve flexible standing orientation
 # /home/tianshu/legged_gym/logs/b1z1/Jul24_15-42-53_ adjust shrink reward mask to achieve straight standing
 # /home/tianshu/legged_gym/logs/b1z1/Jul24_17-45-55_ add ee_goal to the obs and fall
+# /home/tianshu/legged_gym/logs/b1z1/Jul25_13-08-28_ able to grab with body control

@@ -127,6 +127,7 @@ class B1Z1(LeggedRobot):
                                                    device=self.device).repeat(self.num_envs, 1)
         
         self.curr_ee_goal_cart_world = self.get_ee_goal_spherical_center() + quat_apply(self.base_yaw_quat, self.curr_ee_goal_cart)
+        self.is_init = torch.ones(self.num_envs, 1, device=self.device, dtype=torch.bool).squeeze(-1)
 
         if self.cfg.env.history_len > 0:
             self.obs_history_buf = torch.zeros(self.num_envs, self.cfg.env.history_len, self.cfg.env.n_proprio, device=self.device, dtype=torch.float)
@@ -575,7 +576,7 @@ class B1Z1(LeggedRobot):
                 # self.ee_goal_sphere[env_ids] = self.init_end_ee_sphere[:]
                 self._resample_ee_goal_sphere_once_stand(env_ids)
                 self._recenter_ee_goal_sphere(env_ids)
-                self.is_init = torch.ones(self.num_envs, 1, device=self.device, dtype=torch.bool).squeeze(-1)
+                self.is_init[env_ids] = 1
             else:
                 self.is_init[env_ids] = 0
                 self._resample_ee_goal_orn_once(env_ids)
