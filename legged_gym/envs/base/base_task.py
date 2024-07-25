@@ -98,7 +98,6 @@ class BaseTask():
                 self.viewer, gymapi.KEY_ESCAPE, "QUIT")
             self.gym.subscribe_viewer_keyboard_event(
                 self.viewer, gymapi.KEY_V, "toggle_viewer_sync")
-            print('subscribe to space')
             self.gym.subscribe_viewer_keyboard_event(
                 self.viewer, gymapi.KEY_SPACE, "pause")
 

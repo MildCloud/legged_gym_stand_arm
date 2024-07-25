@@ -35,8 +35,8 @@ class B1Z1Cfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
         num_envs = 4096
         num_actions = 19
-        n_proprio = 69
-        # n_proprio = 69 + 3
+        # n_proprio = 69
+        n_proprio = 69 + 3
         history_len = 0
         num_observations = n_proprio * history_len + n_proprio
         num_heights = 187
@@ -170,7 +170,8 @@ class B1Z1Cfg( LeggedRobotCfg ):
             tracking_ang_vel = 0.2
             arm_action = -0.1
             stand_front_feet_shrink = -0.1
-            # tracking_ee_world = 0.1
+            tracking_ee_world = 20
+        tracking_ee_sigma = 1.0
 
 
 class B1Z1CfgPPO( LeggedRobotCfgPPO ):

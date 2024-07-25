@@ -138,16 +138,16 @@ class B1Z1(LeggedRobot):
         """ Computes observations
         """
         dof_pos = self.dof_pos.clone()
-        dof_pos[:, -7:] = self.default_dof_pos[:, -7:]
+        # dof_pos[:, -7:] = self.default_dof_pos[:, -7:]
         dof_vel = self.dof_vel.clone()
-        dof_vel[:, -7:] = 0
+        # dof_vel[:, -7:] = 0
         arm_base_pos = self.root_states[:, :3] + quat_apply(self.base_quat, self.arm_base_offset)
         ee_goal_local_cart = quat_rotate_inverse(self.base_quat, self.curr_ee_goal_cart_world - arm_base_pos)
         prop_obs_buf = torch.cat((  self.base_lin_vel * self.obs_scales.lin_vel,
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
                                     self.commands[:, :3] * self.commands_scale,
-                                    # ee_goal_local_cart,
+                                    ee_goal_local_cart,
                                     (dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                     dof_vel * self.obs_scales.dof_vel,
                                     self.actions
@@ -468,10 +468,11 @@ class B1Z1(LeggedRobot):
         #     self._draw_ee_goal_curr()
         #     self._draw_ee_goal_traj()
         #     self._draw_collision_bbox()
-        self.gym.clear_lines(self.viewer)
-        self._draw_ee_goal_curr()
-        # self._draw_ee_goal_traj()
-        self._draw_collision_bbox()
+        if not self.headless:
+            self.gym.clear_lines(self.viewer)
+            self._draw_ee_goal_curr()
+            # self._draw_ee_goal_traj()
+            self._draw_collision_bbox()
     
     # def _post_physics_step_callback(self):
     #     """ Callback called before computing terminations, rewards, and observations
@@ -535,10 +536,13 @@ class B1Z1(LeggedRobot):
         self.ee_goal_sphere[env_ids, 0] = torch_rand_float(self.goal_ee_ranges["pos_l_stand"][0], self.goal_ee_ranges["pos_l_stand"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         self.ee_goal_sphere[env_ids, 1] = torch_rand_float(self.goal_ee_ranges["pos_p_stand"][0], self.goal_ee_ranges["pos_p_stand"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         self.ee_goal_sphere[env_ids, 2] = torch_rand_float(self.goal_ee_ranges["pos_y_stand"][0], self.goal_ee_ranges["pos_y_stand"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-        # self.ee_goal_sphere[env_ids, 0] = torch.ones(len(env_ids), 1, device=self.device).squeeze(1)
-        # self.ee_goal_sphere[env_ids, 1] = torch.zeros(len(env_ids), 1, device=self.device).squeeze(1)
-        # self.ee_goal_sphere[env_ids, 2] = torch.zeros(len(env_ids), 1, device=self.device).squeeze(1)
-
+        base_pitch = euler_from_quat(self.base_quat)[1]
+        heigh_ee_goal_sphere = torch.zeros_like(self.ee_goal_sphere)
+        heigh_ee_goal_sphere[env_ids, 0] = torch_rand_float(0.9, 0.9, (len(env_ids), 1), device=self.device).squeeze(1)
+        heigh_ee_goal_sphere[env_ids, 1] = torch_rand_float(np.pi / 2, np.pi / 2, (len(env_ids), 1), device=self.device).squeeze(1)
+        stand_mask = base_pitch[env_ids] > -np.pi / 6
+        self.ee_goal_sphere[env_ids] = torch.where(stand_mask[:, None].repeat(1, 3), self.ee_goal_sphere[env_ids], heigh_ee_goal_sphere[env_ids])
+        
     def _resample_ee_goal_orn_once(self, env_ids):
         ee_goal_delta_orn_r = torch_rand_float(self.goal_ee_ranges["delta_orn_r"][0], self.goal_ee_ranges["delta_orn_r"][1], (len(env_ids), 1), device=self.device)
         ee_goal_delta_orn_p = torch_rand_float(self.goal_ee_ranges["delta_orn_p"][0], self.goal_ee_ranges["delta_orn_p"][1], (len(env_ids), 1), device=self.device)
@@ -684,20 +688,17 @@ class B1Z1(LeggedRobot):
         # Penalize stretching the front feet when standing
         base_pitch = euler_from_quat(self.base_quat)[1]
         front_feet_dofs = self.dof_pos[:, :6]
-        # print('front_feet_dofs', front_feet_dofs)
         front_shrink_dofs = torch.tensor([[0.0, 1.6, -2.6, 0.0, 1.6, -2.6]], device=self.device, dtype=torch.float)
         front_shrink_dofs = front_shrink_dofs.repeat(self.num_envs, 1)
         shrink_error = torch.sum(torch.square(front_feet_dofs - front_shrink_dofs), dim=1)
-        # print('shrink_error', shrink_error)
         torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
         # print('base_pitch', base_pitch)
         rew = torch.where(base_pitch < -np.pi/6, 
                           shrink_error, 
                           torch.zeros(self.num_envs, device=self.device, dtype=torch.float))
-        # print('rew', rew)
         return rew
     
     def _reward_tracking_ee_world(self):
         ee_pos_error = torch.sum(torch.abs(self.ee_pos - self.curr_ee_goal_cart_world), dim=1)
         rew = torch.exp(-ee_pos_error/self.cfg.rewards.tracking_ee_sigma * 2)
-        return rew, ee_pos_error
+        return rew
