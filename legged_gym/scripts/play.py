@@ -128,3 +128,6 @@ if __name__ == '__main__':
 # /home/tianshu/legged_gym/logs/b1z1/Jul12_15-52-34_ Remove his obs from the above one
 # /home/tianshu/legged_gym/logs/b1z1/Jul13_14-13-33_ Penalize arm actions to achieve small std
 # /home/tianshu/legged_gym/logs/b1z1/Jul16_10-35-23_ Shrink front legs
+# /home/tianshu/legged_gym/logs/b1z1/Jul24_14-51-52_ remove the orientation reward to achieve flexible standing orientation
+# /home/tianshu/legged_gym/logs/b1z1/Jul24_15-42-53_ adjust shrink reward mask to achieve straight standing
+# /home/tianshu/legged_gym/logs/b1z1/Jul24_17-45-55_ add ee_goal to the obs and fall
