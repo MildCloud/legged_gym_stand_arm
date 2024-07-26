@@ -56,6 +56,9 @@ class B1Z1(LeggedRobot):
         # self.root_states = gymtorch.wrap_tensor(actor_root_state)
         # self.box_root_state = self._root_states[:, 1, :]
 
+        self.base_quat_fix = self.base_quat.clone()
+        self.root_base_fix = self.root_states[:, :3].clone()
+
         base_roll = euler_from_quat(self.base_quat)[0]
         base_pitch = euler_from_quat(self.base_quat)[1]
         base_yaw = euler_from_quat(self.base_quat)[2]
@@ -554,7 +557,8 @@ class B1Z1(LeggedRobot):
         """
         Change the center of the ee_goal_sphere from the arm_base to base, and record the quat
         """
-        self.base_quat_fix = self.base_quat.clone()
+        self.base_quat_fix[env_ids] = self.base_quat[env_ids]
+        self.root_base_fix[env_ids] = self.root_states[env_ids, :3]
         ee_goal_cart = sphere2cart(self.ee_goal_sphere[env_ids])
         ee_goal_cart = ee_goal_cart + self.ee_goal_center_offset_stand[env_ids]
         self.ee_goal_sphere[env_ids] = cart2sphere(ee_goal_cart)
@@ -562,10 +566,12 @@ class B1Z1(LeggedRobot):
     def _compute_ee_start_sphere_from_cur_ee(self, env_ids):
         """Get the spherical coordinate centered at the base of the curr_ee and give that value to ee_start"""
         ee_pose = self.rigid_body_state[env_ids, self.gripper_idx, :3]
-        ee_pose_base = quat_rotate_inverse(self.base_quat_fix[env_ids], (ee_pose - self.root_states[env_ids, :3]))
+        ee_pose_base = quat_rotate_inverse(self.base_quat_fix[env_ids], (ee_pose - self.root_base_fix[env_ids, :3]))
         self.ee_start_sphere[env_ids] = cart2sphere(ee_pose_base)
     
     def _resample_ee_goal(self, env_ids, is_init=False):
+        if 2 in env_ids:
+            print("resample_ee_goal for env 2")
 
         if len(env_ids) > 0:
             init_env_ids = env_ids.clone()
@@ -610,9 +616,10 @@ class B1Z1(LeggedRobot):
 
         self.curr_ee_goal_cart[:] = sphere2cart(self.curr_ee_goal_sphere)
         ee_goal_cart_global = quat_apply(self.base_quat_fix, self.curr_ee_goal_cart)
-        self.curr_ee_goal_cart_world = self.root_states[:, :3] + ee_goal_cart_global
-        self.final_ee_goal_cart_world = self.root_states[:, :3] + quat_apply(self.base_quat_fix, sphere2cart(self.ee_goal_sphere))
-        self.final_ee_start_cart_world = self.root_states[:, :3] + quat_apply(self.base_quat_fix, sphere2cart(self.ee_start_sphere))
+        self.curr_ee_goal_cart_world = self.root_base_fix + ee_goal_cart_global
+        self.final_ee_goal_cart_world = self.root_base_fix + quat_apply(self.base_quat_fix, sphere2cart(self.ee_goal_sphere))
+        print('self.final_ee_goal_cart_world[2]', self.final_ee_goal_cart_world[2])
+        self.final_ee_start_cart_world = self.root_base_fix + quat_apply(self.base_quat_fix, sphere2cart(self.ee_start_sphere))
         
         # default_yaw = torch.atan2(ee_goal_cart_global[:, 1], ee_goal_cart_global[:, 0])
         # default_pitch = -self.curr_ee_goal_sphere[:, 1] + self.cfg.goal_ee.arm_induced_pitch
