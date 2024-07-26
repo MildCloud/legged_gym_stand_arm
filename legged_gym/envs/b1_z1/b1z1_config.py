@@ -166,8 +166,8 @@ class B1Z1Cfg( LeggedRobotCfg ):
             orientation = 0
             base_height = -1 # -0.5
             feet_air_time = 0
-            tracking_lin_vel = 0.2
-            tracking_ang_vel = 0.2
+            tracking_lin_vel = 0.
+            tracking_ang_vel = 0.
             arm_action = -0.1
             stand_front_feet_shrink = -0.1
             tracking_ee_world = 5

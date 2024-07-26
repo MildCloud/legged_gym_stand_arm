@@ -133,3 +133,4 @@ if __name__ == '__main__':
 # /home/tianshu/legged_gym/logs/b1z1/Jul24_17-45-55_ add ee_goal to the obs and fall
 # /home/tianshu/legged_gym/logs/b1z1/Jul25_13-08-28_ able to grab with body control
 # /home/tianshu/legged_gym/logs/b1z1/Jul26_11-46-27_ train with fixed goal_world seems good
+# /home/tianshu/legged_gym/logs/b1z1/Jul26_13-49-05_ remove angular velocity and linear velocity command to chase goal
