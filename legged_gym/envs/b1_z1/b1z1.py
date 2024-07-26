@@ -570,8 +570,6 @@ class B1Z1(LeggedRobot):
         self.ee_start_sphere[env_ids] = cart2sphere(ee_pose_base)
     
     def _resample_ee_goal(self, env_ids, is_init=False):
-        if 2 in env_ids:
-            print("resample_ee_goal for env 2")
 
         if len(env_ids) > 0:
             init_env_ids = env_ids.clone()
@@ -618,7 +616,6 @@ class B1Z1(LeggedRobot):
         ee_goal_cart_global = quat_apply(self.base_quat_fix, self.curr_ee_goal_cart)
         self.curr_ee_goal_cart_world = self.root_base_fix + ee_goal_cart_global
         self.final_ee_goal_cart_world = self.root_base_fix + quat_apply(self.base_quat_fix, sphere2cart(self.ee_goal_sphere))
-        print('self.final_ee_goal_cart_world[2]', self.final_ee_goal_cart_world[2])
         self.final_ee_start_cart_world = self.root_base_fix + quat_apply(self.base_quat_fix, sphere2cart(self.ee_start_sphere))
         
         # default_yaw = torch.atan2(ee_goal_cart_global[:, 1], ee_goal_cart_global[:, 0])
