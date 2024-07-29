@@ -134,3 +134,4 @@ if __name__ == '__main__':
 # /home/tianshu/legged_gym/logs/b1z1/Jul25_13-08-28_ able to grab with body control
 # /home/tianshu/legged_gym/logs/b1z1/Jul26_11-46-27_ train with fixed goal_world seems good
 # /home/tianshu/legged_gym/logs/b1z1/Jul26_13-49-05_ remove angular velocity and linear velocity command to chase goal
+# /home/tianshu/legged_gym/logs/b1z1/Jul29_13-52-59_ remove init observation for the goal to have better init pose
