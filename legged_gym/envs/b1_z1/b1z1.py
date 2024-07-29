@@ -147,6 +147,7 @@ class B1Z1(LeggedRobot):
         # dof_vel[:, -7:] = 0
         arm_base_pos = self.root_states[:, :3] + quat_apply(self.base_quat, self.arm_base_offset)
         ee_goal_local_cart = quat_rotate_inverse(self.base_quat, self.curr_ee_goal_cart_world - arm_base_pos)
+        ee_goal_local_cart = torch.where(self.is_init[:, None].repeat(1, 3), torch.zeros_like(ee_goal_local_cart), ee_goal_local_cart)
         prop_obs_buf = torch.cat((  self.base_lin_vel * self.obs_scales.lin_vel,
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
