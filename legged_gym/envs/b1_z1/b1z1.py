@@ -625,6 +625,7 @@ class B1Z1(LeggedRobot):
         self.ee_goal_orn_euler = torch.zeros(self.num_envs, 3, device=self.device)
         self.ee_goal_orn_euler[:, 0] = np.pi / 2
         self.ee_goal_orn_euler[:, 1] = -np.pi / 12
+        self.ee_goal_orn_euler[:, 2] = euler_from_quat(self.base_quat_fix)[2]
         self.ee_goal_orn_quat = quat_from_euler_xyz(self.ee_goal_orn_euler[:, 0], self.ee_goal_orn_euler[:, 1], self.ee_goal_orn_euler[:, 2])
 
         self.goal_timer += 1
