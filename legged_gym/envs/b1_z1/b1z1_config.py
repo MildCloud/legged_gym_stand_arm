@@ -160,14 +160,17 @@ class B1Z1Cfg( LeggedRobotCfg ):
         class scales( LeggedRobotCfg.rewards.scales ):
             # torques = -0.0002
             torques = 0
-            dof_pos_limits = -10.0
-            stand_up_x = 3
-            flfr_footforce = -5 # -0.2
             orientation = 0
-            base_height = -1 # -0.5
             feet_air_time = 0
             tracking_lin_vel = 0.
             tracking_ang_vel = 0.
+            
+            dof_pos_limits = -10.0
+            lin_vel_z = -2.0
+            ang_vel_xy = -0.05
+            stand_up_x = 3
+            flfr_footforce = -5 # -0.2
+            base_height = -1 # -0.5
             arm_action = -0.1
             stand_front_feet_shrink = -0.1
             tracking_ee_world = 5
